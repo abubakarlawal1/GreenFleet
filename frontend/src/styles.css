@@ -1,0 +1,159 @@
+:root{
+  --navy:#0b1f3b;
+  --navy2:#0f2a50;
+  --bg:#f3f6fb;
+  --card:#ffffff;
+  --text:#0b1220;
+  --muted:#5e6b7e;
+  --border:#dbe3ef;
+  --dangerText:#8a1f1f;
+  --shadow: 0 10px 25px rgba(5, 20, 45, 0.10);
+  --radius: 18px;
+}
+
+*{ box-sizing: border-box; }
+body{
+  margin:0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  background: radial-gradient(1200px 500px at 20% -10%, rgba(11,31,59,0.10), transparent 60%),
+              radial-gradient(900px 500px at 80% 0%, rgba(11,31,59,0.08), transparent 55%),
+              var(--bg);
+  color: var(--text);
+}
+
+a{ color: var(--navy2); text-decoration: none; }
+a:hover{ text-decoration: underline; }
+
+.container{
+  width: min(1100px, 92%);
+  margin: 0 auto;
+  padding: 18px 0 40px;
+}
+
+.nav{
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(10px);
+  background: rgba(243,246,251,0.72);
+  border-bottom: 1px solid var(--border);
+}
+.nav-inner{
+  width: min(1100px, 92%);
+  margin: 0 auto;
+  padding: 14px 0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 16px;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  font-weight: 800;
+  color: var(--navy);
+}
+.dot{
+  width: 12px; height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--navy), var(--navy2));
+  box-shadow: 0 0 0 6px rgba(11,31,59,0.12);
+}
+.pill{
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  color: var(--muted);
+}
+
+.nav-links{ display:flex; align-items:center; gap: 12px; flex-wrap: wrap; }
+.nav-links a{
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: var(--navy);
+  font-weight: 600;
+}
+.nav-links a:hover{ background: rgba(11,31,59,0.08); text-decoration: none; }
+
+.card{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 18px;
+}
+
+.h1{ font-size: 34px; margin: 0 0 6px; color: var(--navy); }
+.h2{ font-size: 18px; margin: 0 0 12px; color: var(--navy); }
+.muted{ color: var(--muted); margin: 0 0 12px; }
+
+.grid{ display:grid; gap: 12px; }
+.grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+@media (max-width: 760px){ .grid-2, .grid-3{ grid-template-columns: 1fr; } }
+
+label{ display:block; font-weight: 700; color: var(--navy); margin-bottom: 6px; font-size: 14px; }
+input, select{
+  width: 100%;
+  padding: 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  outline: none;
+  background: #fff;
+}
+input:focus, select:focus{
+  border-color: rgba(11,31,59,0.5);
+  box-shadow: 0 0 0 4px rgba(11,31,59,0.08);
+}
+
+.btn{
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--navy), var(--navy2));
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+.btn:hover{ filter: brightness(1.05); }
+.btn:active{ transform: translateY(1px); }
+
+.btn-ghost{
+  width: auto;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--navy);
+}
+
+.alert{
+  border-radius: 14px;
+  padding: 12px 12px;
+  background: #fde2e2;
+  border: 1px solid #f6c7c7;
+  color: var(--dangerText);
+  font-weight: 700;
+}
+.notice{
+  border-radius: 14px;
+  padding: 12px 12px;
+  background: #d7f0df;
+  border: 1px solid #b9e3c7;
+  color: #165a2a;
+  font-weight: 700;
+}
+
+.table{ width: 100%; border-collapse: collapse; }
+.table th, .table td{ border-top: 1px solid var(--border); padding: 10px 8px; text-align: left; font-size: 14px; }
+.table thead th{ border-top: none; color: var(--muted); font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+
+.stat{ display:flex; flex-direction: column; gap: 6px; padding: 16px; }
+.stat-k{ color: var(--muted); font-weight: 800; text-transform: uppercase; font-size: 12px; letter-spacing: .5px; }
+.stat-v{ font-size: 26px; font-weight: 900; color: var(--navy); }
