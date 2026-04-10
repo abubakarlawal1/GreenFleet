@@ -7,6 +7,11 @@ import Dashboard from "./components/Dashboard";
 import VesselForm from "./components/VesselForm";
 import VoyageForm from "./components/VoyageForm";
 import CreateUser from "./components/CreateUser";
+import Recommendations from "./components/Recommendations";
+import Reports from "./components/Reports";
+import Alerts from "./components/Alerts";
+import AuditLogs from "./components/AuditLogs";
+import ImportCSV from "./components/ImportCSV";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -43,51 +48,64 @@ export default function App() {
     if (u !== username) setUsername(u);
   }, []);
 
-  // Helper: check if current role can write data (create/edit/delete)
   const canWrite = ["Admin", "Sustainability Officer", "Manager"].includes(role);
+  const canRecommend = ["Admin", "Sustainability Officer"].includes(role);
   const isAdmin = role === "Admin";
+
+  const denied = (msg) => (
+    <div className="container"><div className="card alert">{msg}</div></div>
+  );
 
   return (
     <BrowserRouter>
       {token && <Navbar role={role} username={username} onLogout={onLogout} />}
-
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<Login onLogin={onLogin} />} />
         <Route path="/setup" element={<SetupAdmin />} />
 
-        {/* All authenticated users can view the dashboard */}
         <Route path="/dashboard" element={
-          <ProtectedRoute token={token}>
-            <Dashboard token={token} role={role} />
-          </ProtectedRoute>
+          <ProtectedRoute token={token}><Dashboard token={token} role={role} /></ProtectedRoute>
         } />
 
-        {/* Only Admin, Sustainability Officer, Manager can add vessels */}
         <Route path="/vessels/new" element={
           <ProtectedRoute token={token}>
-            {canWrite
-              ? <VesselForm token={token} />
-              : <div className="container"><div className="card alert">You do not have permission to add vessels.</div></div>
-            }
+            {canWrite ? <VesselForm token={token} /> : denied("You do not have permission to add vessels.")}
           </ProtectedRoute>
         } />
 
-        {/* Only Admin, Sustainability Officer, Manager can add voyages */}
         <Route path="/voyages/new" element={
           <ProtectedRoute token={token}>
-            {canWrite
-              ? <VoyageForm token={token} />
-              : <div className="container"><div className="card alert">You do not have permission to add voyages.</div></div>
-            }
+            {canWrite ? <VoyageForm token={token} /> : denied("You do not have permission to add voyages.")}
           </ProtectedRoute>
         } />
 
-        {/* Only Admin can create users */}
-        <Route path="/users/new" element={
+        <Route path="/voyages/import" element={
           <ProtectedRoute token={token}>
-            <CreateUser token={token} role={role} />
+            {canWrite ? <ImportCSV token={token} /> : denied("You do not have permission to import data.")}
           </ProtectedRoute>
+        } />
+
+        <Route path="/recommendations" element={
+          <ProtectedRoute token={token}>
+            {canRecommend ? <Recommendations token={token} /> : denied("Only Admin and Sustainability Officers can access recommendations.")}
+          </ProtectedRoute>
+        } />
+
+        <Route path="/reports" element={
+          <ProtectedRoute token={token}><Reports token={token} role={role} /></ProtectedRoute>
+        } />
+
+        <Route path="/alerts" element={
+          <ProtectedRoute token={token}><Alerts token={token} /></ProtectedRoute>
+        } />
+
+        <Route path="/users/new" element={
+          <ProtectedRoute token={token}><CreateUser token={token} role={role} /></ProtectedRoute>
+        } />
+
+        <Route path="/audit-logs" element={
+          <ProtectedRoute token={token}><AuditLogs token={token} role={role} /></ProtectedRoute>
         } />
 
         <Route path="*" element={<Navigate to="/login" replace />} />

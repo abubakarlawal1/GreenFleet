@@ -3,6 +3,12 @@ const router = express.Router();
 const pool = require("../config/db");
 const { authenticateToken, authorizeRoles } = require("../middleware/authMiddleware");
 const { Parser } = require("json2csv");
+const multer = require("multer");
+const csvParser = require("csv-parser");
+const { Readable } = require("stream");
+
+// Multer stores uploaded CSV in memory (no disk needed for small files)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // ------------------------------------------------------------------
 // Emission factors (tonnes of emission per tonne of fuel burned)
@@ -228,6 +234,107 @@ router.get("/export/csv", authenticateToken, authorizeRoles("Admin", "Sustainabi
   } catch (err) {
     return res.status(500).json({ message: "Server error", error: err.message });
   }
+});
+
+// ------------------------------------------------------------------
+// POST /api/voyages/import/csv — Bulk import voyages from CSV file
+// Expected CSV columns: vessel_id, departure_port, arrival_port,
+//   voyage_date, distance_nm, duration_hours, fuel_type, fuel_tons
+// Roles: Admin, Sustainability Officer, Manager
+// ------------------------------------------------------------------
+router.post("/import/csv", authenticateToken, authorizeRoles("Admin", "Sustainability Officer", "Manager"), upload.single("file"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "No CSV file uploaded. Use form field name 'file'." });
+  }
+
+  const rows = [];
+  const errors = [];
+
+  // Parse CSV from the uploaded buffer
+  try {
+    await new Promise((resolve, reject) => {
+      const stream = Readable.from(req.file.buffer.toString());
+      stream
+        .pipe(csvParser())
+        .on("data", (row) => rows.push(row))
+        .on("end", resolve)
+        .on("error", reject);
+    });
+  } catch (err) {
+    return res.status(400).json({ message: "Failed to parse CSV file", error: err.message });
+  }
+
+  if (rows.length === 0) {
+    return res.status(400).json({ message: "CSV file is empty or has no valid rows" });
+  }
+
+  let imported = 0;
+  let alertsCreated = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const rowNum = i + 2; // +2 because row 1 is the header
+
+    // Validate required fields
+    const vessel_id = parseInt(r.vessel_id);
+    const distance_nm = parseFloat(r.distance_nm);
+    const fuel_tons = parseFloat(r.fuel_tons);
+
+    if (!vessel_id || isNaN(distance_nm) || isNaN(fuel_tons)) {
+      errors.push(`Row ${rowNum}: missing or invalid vessel_id, distance_nm, or fuel_tons`);
+      continue;
+    }
+
+    if (distance_nm <= 0 || fuel_tons <= 0) {
+      errors.push(`Row ${rowNum}: distance_nm and fuel_tons must be positive`);
+      continue;
+    }
+
+    const e = computeEmissions(r.fuel_type, fuel_tons);
+
+    try {
+      const result = await pool.query(
+        `INSERT INTO voyages
+          (vessel_id, departure_port, arrival_port, voyage_date, distance_nm, duration_hours,
+           fuel_type, fuel_tons, co2_tons, nox_tons, sox_tons, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         RETURNING id`,
+        [vessel_id, r.departure_port || null, r.arrival_port || null,
+         r.voyage_date || null, distance_nm, parseFloat(r.duration_hours) || null,
+         r.fuel_type || null, fuel_tons, e.co2_tons, e.nox_tons, e.sox_tons, req.user.id]
+      );
+
+      imported++;
+
+      // Auto-generate alert if needed
+      if (e.co2_tons > CO2_ALERT_THRESHOLD) {
+        await pool.query(
+          `INSERT INTO alerts (vessel_id, voyage_id, alert_type, message, severity)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [vessel_id, result.rows[0].id, "High Emission",
+           `Imported voyage ${result.rows[0].id} produced ${e.co2_tons}t CO2, exceeding the ${CO2_ALERT_THRESHOLD}t threshold.`,
+           e.co2_tons > 500 ? "Critical" : "High"]
+        );
+        alertsCreated++;
+      }
+    } catch (err) {
+      errors.push(`Row ${rowNum}: ${err.message}`);
+    }
+  }
+
+  // Audit log
+  await pool.query(
+    "INSERT INTO audit_logs (user_id, action, entity_type, details) VALUES ($1, $2, $3, $4)",
+    [req.user.id, "IMPORT_CSV", "voyage", JSON.stringify({ total_rows: rows.length, imported, errors: errors.length })]
+  );
+
+  return res.json({
+    message: `CSV import complete: ${imported} voyages imported, ${errors.length} errors`,
+    imported,
+    alerts_created: alertsCreated,
+    total_rows: rows.length,
+    errors: errors.slice(0, 20), // Return first 20 errors max
+  });
 });
 
 module.exports = router;
