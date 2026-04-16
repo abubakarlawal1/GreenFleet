@@ -121,7 +121,7 @@ export default function Dashboard({ token, role }) {
             onChange={(e) => setSelectedVessel(e.target.value)}
             style={{ maxWidth: 400, flex: 1 }}
           >
-            <option value="">All vessels (fleet-wide)</option>
+            <option value="">All vessels</option>
             {vessels.map((v) => (
               <option key={v.id} value={v.id}>{v.name} ({v.imo_number})</option>
             ))}
@@ -154,7 +154,10 @@ export default function Dashboard({ token, role }) {
 
       <div className="grid-2">
         <div className="card">
-          <h2 className="h2">CO2 by Recent Voyage</h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <h2 className="h2" style={{ margin: 0 }}>Recent Voyages</h2>
+            {canDelete && <a href="/voyages/new" className="btn btn-ghost">+ Add Voyage</a>}
+      </div>
           <div style={{ height: 280 }}>
             <Bar data={barData} options={{
               responsive: true, maintainAspectRatio: false,
