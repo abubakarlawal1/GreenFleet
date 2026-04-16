@@ -6,25 +6,18 @@ const PDFDocument = require("pdfkit");
 
 // ------------------------------------------------------------------
 // POST /api/reports/generate
-// Generate a compliance report for a vessel over a date range
-// Roles: Admin, Sustainability Officer
 // ------------------------------------------------------------------
 router.post("/generate", authenticateToken, authorizeRoles("Admin", "Sustainability Officer"), async (req, res) => {
   const { vessel_id, report_type, period_start, period_end } = req.body;
-
   if (!vessel_id || !period_start || !period_end) {
     return res.status(400).json({ message: "vessel_id, period_start, and period_end are required" });
   }
 
   try {
-    // Get vessel info
     const vesselResult = await pool.query("SELECT * FROM vessels WHERE id = $1", [vessel_id]);
-    if (vesselResult.rows.length === 0) {
-      return res.status(404).json({ message: "Vessel not found" });
-    }
+    if (vesselResult.rows.length === 0) return res.status(404).json({ message: "Vessel not found" });
     const vessel = vesselResult.rows[0];
 
-    // Aggregate voyage data for the period
     const voyageResult = await pool.query(
       `SELECT
          COUNT(*)::int AS voyage_count,
@@ -42,7 +35,6 @@ router.post("/generate", authenticateToken, authorizeRoles("Admin", "Sustainabil
     );
     const stats = voyageResult.rows[0];
 
-    // Get individual voyages for the breakdown
     const voyagesDetail = await pool.query(
       `SELECT id, departure_port, arrival_port, voyage_date, distance_nm,
               fuel_type, fuel_tons, co2_tons, nox_tons, sox_tons
@@ -52,32 +44,19 @@ router.post("/generate", authenticateToken, authorizeRoles("Admin", "Sustainabil
       [vessel_id, period_start, period_end]
     );
 
-    // Calculate EEOI (Energy Efficiency Operational Indicator)
-    // EEOI = Total CO2 / (Total Distance × Gross Tonnage)
-    // Unit: grams CO2 per tonne-nautical mile
     let eeoi = null;
     if (stats.total_distance > 0 && vessel.gross_tonnage > 0) {
       eeoi = (Number(stats.total_co2) * 1000000) / (Number(stats.total_distance) * Number(vessel.gross_tonnage));
       eeoi = Number(eeoi.toFixed(4));
     }
 
-    // Determine compliance status based on EEOI thresholds
-    // Reference: IMO MEPC.1/Circ.684 — Guidelines for EEOI Calculation
     let compliance_status = "Pending";
     if (eeoi !== null) {
-      if (eeoi <= 15) compliance_status = "Compliant";
-      else compliance_status = "Non-Compliant";
+      compliance_status = eeoi <= 15 ? "Compliant" : "Non-Compliant";
     }
 
-    // Build the full report data object
     const reportData = {
-      vessel: {
-        name: vessel.name,
-        imo_number: vessel.imo_number,
-        vessel_type: vessel.vessel_type,
-        flag_state: vessel.flag_state,
-        gross_tonnage: vessel.gross_tonnage,
-      },
+      vessel: { name: vessel.name, imo_number: vessel.imo_number, vessel_type: vessel.vessel_type, flag_state: vessel.flag_state, gross_tonnage: vessel.gross_tonnage },
       period: { start: period_start, end: period_end },
       summary: {
         voyage_count: stats.voyage_count,
@@ -93,7 +72,6 @@ router.post("/generate", authenticateToken, authorizeRoles("Admin", "Sustainabil
       compliance_status: compliance_status,
     };
 
-    // Save the report to database
     const insertResult = await pool.query(
       `INSERT INTO compliance_reports
         (vessel_id, report_type, period_start, period_end, total_co2, total_nox,
@@ -105,27 +83,20 @@ router.post("/generate", authenticateToken, authorizeRoles("Admin", "Sustainabil
        stats.total_distance, compliance_status, JSON.stringify(reportData), req.user.id]
     );
 
-    // Audit log
     await pool.query(
       "INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details) VALUES ($1, $2, $3, $4, $5)",
       [req.user.id, "GENERATE_REPORT", "compliance_report", insertResult.rows[0].id,
        JSON.stringify({ vessel_name: vessel.name, report_type: report_type || "DCS" })]
     );
 
-    return res.status(201).json({
-      message: "Compliance report generated",
-      reportId: insertResult.rows[0].id,
-      report: reportData,
-    });
+    return res.status(201).json({ message: "Compliance report generated", reportId: insertResult.rows[0].id, report: reportData });
   } catch (err) {
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
 // ------------------------------------------------------------------
-// GET /api/reports
-// List all generated reports
-// Roles: Admin, Sustainability Officer, Viewer (read-only)
+// GET /api/reports — List all reports
 // ------------------------------------------------------------------
 router.get("/", authenticateToken, async (req, res) => {
   try {
@@ -144,8 +115,7 @@ router.get("/", authenticateToken, async (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// GET /api/reports/:id
-// Get a single report with full data
+// GET /api/reports/:id — Single report with full data
 // ------------------------------------------------------------------
 router.get("/:id", authenticateToken, async (req, res) => {
   try {
@@ -157,9 +127,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
       [req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: "Report not found" });
-
     const report = result.rows[0];
-    // Parse the stored JSON report data
     if (report.report_data && typeof report.report_data === "string") {
       report.report_data = JSON.parse(report.report_data);
     }
@@ -170,7 +138,29 @@ router.get("/:id", authenticateToken, async (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// GET /api/reports/:id/pdf — Download a compliance report as PDF
+// DELETE /api/reports/:id — Delete a single report
+// ------------------------------------------------------------------
+router.delete("/:id", authenticateToken, authorizeRoles("Admin", "Sustainability Officer"), async (req, res) => {
+  try {
+    const result = await pool.query(
+      "DELETE FROM compliance_reports WHERE id = $1 RETURNING id",
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: "Report not found" });
+
+    await pool.query(
+      "INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES ($1, $2, $3, $4)",
+      [req.user.id, "DELETE_REPORT", "compliance_report", req.params.id]
+    );
+
+    return res.json({ message: "Report deleted" });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+// ------------------------------------------------------------------
+// GET /api/reports/:id/pdf — Download report as PDF
 // ------------------------------------------------------------------
 router.get("/:id/pdf", authenticateToken, async (req, res) => {
   try {
@@ -187,26 +177,20 @@ router.get("/:id/pdf", authenticateToken, async (req, res) => {
     let data = report.report_data;
     if (typeof data === "string") data = JSON.parse(data);
 
-    // Create PDF document
     const doc = new PDFDocument({ size: "A4", margin: 50 });
-
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=GreenFleet_Report_${report.id}.pdf`);
     doc.pipe(res);
 
-    // --- Header ---
     doc.fontSize(22).font("Helvetica-Bold").text("GreenFleet", { align: "center" });
     doc.fontSize(10).font("Helvetica").text("Carbon Emission Management System for Maritime Vessels", { align: "center" });
     doc.moveDown(0.5);
     doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke("#cccccc");
     doc.moveDown(1);
 
-    // --- Report title ---
-    doc.fontSize(16).font("Helvetica-Bold")
-      .text(`${report.report_type} Compliance Report`, { align: "center" });
+    doc.fontSize(16).font("Helvetica-Bold").text(`${report.report_type} Compliance Report`, { align: "center" });
     doc.moveDown(0.5);
 
-    // --- Vessel details ---
     doc.fontSize(12).font("Helvetica-Bold").text("Vessel Information");
     doc.moveDown(0.3);
     doc.fontSize(10).font("Helvetica");
@@ -217,7 +201,6 @@ router.get("/:id/pdf", authenticateToken, async (req, res) => {
     doc.text(`Gross Tonnage: ${data.vessel?.gross_tonnage || "N/A"} GT`);
     doc.moveDown(1);
 
-    // --- Reporting period ---
     doc.fontSize(12).font("Helvetica-Bold").text("Reporting Period");
     doc.moveDown(0.3);
     doc.fontSize(10).font("Helvetica");
@@ -226,7 +209,6 @@ router.get("/:id/pdf", authenticateToken, async (req, res) => {
     doc.text(`Report Generated: ${new Date(report.generated_at).toLocaleString()}`);
     doc.moveDown(1);
 
-    // --- Emission summary ---
     doc.fontSize(12).font("Helvetica-Bold").text("Emission Summary");
     doc.moveDown(0.3);
     doc.fontSize(10).font("Helvetica");
@@ -239,10 +221,9 @@ router.get("/:id/pdf", authenticateToken, async (req, res) => {
     doc.text(`Total SOx Emissions: ${data.summary?.total_sox || 0} tonnes`);
     doc.text(`Average CO\u2082 per Voyage: ${data.summary?.avg_co2_per_voyage || 0} tonnes`);
     doc.moveDown(0.5);
-    doc.text(`EEOI (Energy Efficiency Operational Indicator): ${data.summary?.eeoi ?? "N/A"} g CO\u2082/t\u00b7nm`);
+    doc.text(`EEOI: ${data.summary?.eeoi ?? "N/A"} g CO\u2082/t\u00b7nm`);
     doc.moveDown(1);
 
-    // --- Compliance status ---
     const status = data.compliance_status || report.compliance_status || "Pending";
     doc.fontSize(12).font("Helvetica-Bold").text("Compliance Status");
     doc.moveDown(0.3);
@@ -254,15 +235,11 @@ router.get("/:id/pdf", authenticateToken, async (req, res) => {
     doc.fillColor("black");
     doc.moveDown(1);
 
-    // --- Voyage breakdown table ---
     if (data.voyages && data.voyages.length > 0) {
       doc.fontSize(12).font("Helvetica-Bold").text("Voyage Breakdown");
       doc.moveDown(0.5);
-
-      // Table header
       const tableTop = doc.y;
       const col = { date: 50, route: 120, dist: 260, fuel: 330, co2: 400, nox: 460, sox: 510 };
-
       doc.fontSize(8).font("Helvetica-Bold");
       doc.text("Date", col.date, tableTop);
       doc.text("Route", col.route, tableTop);
@@ -271,20 +248,12 @@ router.get("/:id/pdf", authenticateToken, async (req, res) => {
       doc.text("CO2 (t)", col.co2, tableTop);
       doc.text("NOx (t)", col.nox, tableTop);
       doc.text("SOx (t)", col.sox, tableTop);
-
       doc.moveTo(50, tableTop + 14).lineTo(555, tableTop + 14).stroke("#cccccc");
-
       let y = tableTop + 20;
       doc.fontSize(8).font("Helvetica");
-
       for (const v of data.voyages) {
-        if (y > 750) {
-          doc.addPage();
-          y = 50;
-        }
-
+        if (y > 750) { doc.addPage(); y = 50; }
         const route = `${v.departure_port || "-"} > ${v.arrival_port || "-"}`;
-
         doc.text(v.voyage_date || "-", col.date, y, { width: 65 });
         doc.text(route, col.route, y, { width: 130 });
         doc.text(String(v.distance_nm), col.dist, y);
@@ -292,12 +261,10 @@ router.get("/:id/pdf", authenticateToken, async (req, res) => {
         doc.text(String(v.co2_tons), col.co2, y);
         doc.text(String(v.nox_tons), col.nox, y);
         doc.text(String(v.sox_tons), col.sox, y);
-
         y += 16;
       }
     }
 
-    // --- Footer ---
     doc.moveDown(2);
     doc.fontSize(8).font("Helvetica").fillColor("#999999");
     doc.text(
@@ -305,7 +272,6 @@ router.get("/:id/pdf", authenticateToken, async (req, res) => {
       "Emission factors are based on the IMO Fourth GHG Study 2020.",
       50, doc.y, { width: 500, align: "center" }
     );
-
     doc.end();
   } catch (err) {
     return res.status(500).json({ message: "Server error", error: err.message });

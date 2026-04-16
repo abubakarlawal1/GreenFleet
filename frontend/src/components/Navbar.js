@@ -21,7 +21,6 @@ export default function Navbar({ role, username, onLogout }) {
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/vessels">Vessels</Link>
           {canWrite && <Link to="/voyages/new">Add Voyage</Link>}
-          {canWrite && <Link to="/voyages/import">Import CSV</Link>}
           {canRecommend && <Link to="/recommendations">Recommendations</Link>}
           <Link to="/reports">Reports</Link>
           <Link to="/alerts">Alerts</Link>

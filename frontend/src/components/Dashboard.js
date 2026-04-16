@@ -154,10 +154,7 @@ export default function Dashboard({ token, role }) {
 
       <div className="grid-2">
         <div className="card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <h2 className="h2" style={{ margin: 0 }}>Recent Voyages</h2>
-            {canDelete && <a href="/voyages/new" className="btn btn-ghost">+ Add Voyage</a>}
-      </div>
+          <h2 className="h2">Recent Voyages</h2>  
           <div style={{ height: 280 }}>
             <Bar data={barData} options={{
               responsive: true, maintainAspectRatio: false,

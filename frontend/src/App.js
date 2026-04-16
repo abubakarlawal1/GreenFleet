@@ -12,7 +12,6 @@ import Recommendations from "./components/Recommendations";
 import Reports from "./components/Reports";
 import Alerts from "./components/Alerts";
 import AuditLogs from "./components/AuditLogs";
-import ImportCSV from "./components/ImportCSV";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -22,16 +21,13 @@ export default function App() {
   const [username, setUsername] = useState(localStorage.getItem("username") || "");
   const [currentUserId, setCurrentUserId] = useState(null);
 
-  // Decode token to get current user's ID (so we can prevent self-delete)
   useEffect(() => {
     if (token) {
       try {
         const decoded = JSON.parse(atob(token.split(".")[1]));
         setCurrentUserId(decoded.id);
       } catch (err) { setCurrentUserId(null); }
-    } else {
-      setCurrentUserId(null);
-    }
+    } else { setCurrentUserId(null); }
   }, [token]);
 
   const onLogin = (t, r, u) => {
@@ -72,7 +68,6 @@ export default function App() {
           <ProtectedRoute token={token}><Dashboard token={token} role={role} /></ProtectedRoute>
         } />
 
-        {/* Vessels list - all logged-in users can view; write actions gated inside component */}
         <Route path="/vessels" element={
           <ProtectedRoute token={token}><Vessels token={token} role={role} /></ProtectedRoute>
         } />
@@ -89,12 +84,6 @@ export default function App() {
           </ProtectedRoute>
         } />
 
-        <Route path="/voyages/import" element={
-          <ProtectedRoute token={token}>
-            {canWrite ? <ImportCSV token={token} /> : denied("You do not have permission to import data.")}
-          </ProtectedRoute>
-        } />
-
         <Route path="/recommendations" element={
           <ProtectedRoute token={token}>
             {canRecommend ? <Recommendations token={token} /> : denied("Only Admin and Sustainability Officers can access recommendations.")}
@@ -106,10 +95,9 @@ export default function App() {
         } />
 
         <Route path="/alerts" element={
-          <ProtectedRoute token={token}><Alerts token={token} /></ProtectedRoute>
+          <ProtectedRoute token={token}><Alerts token={token} role={role} /></ProtectedRoute>
         } />
 
-        {/* Users page - Admin only */}
         <Route path="/users" element={
           <ProtectedRoute token={token}><Users token={token} role={role} currentUserId={currentUserId} /></ProtectedRoute>
         } />
