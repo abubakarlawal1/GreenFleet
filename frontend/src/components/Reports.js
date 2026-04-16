@@ -197,12 +197,8 @@ export default function Reports({ token, role }) {
                 <td><span style={statusStyle(r.compliance_status)}>{r.compliance_status}</span></td>
                 <td style={{ whiteSpace: "nowrap" }}>
                   <button className="btn btn-ghost" style={{ marginRight: 4 }} onClick={() => viewReport(r.id)}>View</button>
-                  <button className="btn btn-ghost" style={{ marginRight: 4 }} onClick={() => downloadPdf(r.id)}>PDF</button>
                   {canDelete && (
-                    <button onClick={() => deleteReport(r.id)} title="Delete report"
-                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: 4 }}>
-                      🗑️
-                    </button>
+                    <button className="btn btn-ghost" style={{ color: "#8a1f1f" }} onClick={() => deleteReport(r.id)}>Delete</button>
                   )}
                 </td>
               </tr>

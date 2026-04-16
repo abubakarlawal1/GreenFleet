@@ -1,211 +1,281 @@
-import React, { useEffect, useState } from "react";
-import { api } from "../api";
+const express = require("express");
+const router = express.Router();
+const pool = require("../config/db");
+const { authenticateToken, authorizeRoles } = require("../middleware/authMiddleware");
+const PDFDocument = require("pdfkit");
 
-export default function Reports({ token, role }) {
-  const [vessels, setVessels] = useState([]);
-  const [reports, setReports] = useState([]);
-  const [form, setForm] = useState({ vessel_id: "", report_type: "DCS", period_start: "", period_end: "" });
-  const [activeReport, setActiveReport] = useState(null);
-  const [activeReportId, setActiveReportId] = useState(null);
-  const [msg, setMsg] = useState(null);
-  const [loading, setLoading] = useState(false);
+// ------------------------------------------------------------------
+// POST /api/reports/generate
+// ------------------------------------------------------------------
+router.post("/generate", authenticateToken, authorizeRoles("Admin", "Sustainability Officer"), async (req, res) => {
+  const { vessel_id, report_type, period_start, period_end } = req.body;
+  if (!vessel_id || !period_start || !period_end) {
+    return res.status(400).json({ message: "vessel_id, period_start, and period_end are required" });
+  }
 
-  const canGenerate = ["Admin", "Sustainability Officer"].includes(role);
-  const canDelete = ["Admin", "Sustainability Officer"].includes(role);
+  try {
+    const vesselResult = await pool.query("SELECT * FROM vessels WHERE id = $1", [vessel_id]);
+    if (vesselResult.rows.length === 0) return res.status(404).json({ message: "Vessel not found" });
+    const vessel = vesselResult.rows[0];
 
-  const loadReports = () => {
-    api.get("/api/reports", { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => setReports(r.data)).catch(console.log);
-  };
+    const voyageResult = await pool.query(
+      `SELECT
+         COUNT(*)::int AS voyage_count,
+         COALESCE(SUM(co2_tons), 0) AS total_co2,
+         COALESCE(SUM(nox_tons), 0) AS total_nox,
+         COALESCE(SUM(sox_tons), 0) AS total_sox,
+         COALESCE(SUM(fuel_tons), 0) AS total_fuel,
+         COALESCE(SUM(distance_nm), 0) AS total_distance,
+         COALESCE(AVG(co2_tons), 0) AS avg_co2_per_voyage,
+         MIN(voyage_date) AS first_voyage,
+         MAX(voyage_date) AS last_voyage
+       FROM voyages
+       WHERE vessel_id = $1 AND voyage_date >= $2 AND voyage_date <= $3`,
+      [vessel_id, period_start, period_end]
+    );
+    const stats = voyageResult.rows[0];
 
-  useEffect(() => {
-    const headers = { Authorization: `Bearer ${token}` };
-    api.get("/api/vessels", { headers }).then((r) => setVessels(r.data)).catch(console.log);
-    loadReports();
-  }, [token]);
+    const voyagesDetail = await pool.query(
+      `SELECT id, departure_port, arrival_port, voyage_date, distance_nm,
+              fuel_type, fuel_tons, co2_tons, nox_tons, sox_tons
+       FROM voyages
+       WHERE vessel_id = $1 AND voyage_date >= $2 AND voyage_date <= $3
+       ORDER BY voyage_date ASC`,
+      [vessel_id, period_start, period_end]
+    );
 
-  const generate = async (e) => {
-    e.preventDefault();
-    setMsg(null);
-    setLoading(true);
-    try {
-      const res = await api.post("/api/reports/generate", form, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setActiveReport(res.data.report);
-      setActiveReportId(res.data.reportId);
-      setMsg({ type: "ok", text: `Report generated (ID: ${res.data.reportId})` });
-      loadReports();
-    } catch (err) {
-      setMsg({ type: "err", text: err.response?.data?.message || "Failed" });
+    let eeoi = null;
+    if (stats.total_distance > 0 && vessel.gross_tonnage > 0) {
+      eeoi = (Number(stats.total_co2) * 1000000) / (Number(stats.total_distance) * Number(vessel.gross_tonnage));
+      eeoi = Number(eeoi.toFixed(4));
     }
-    setLoading(false);
-  };
 
-  const viewReport = async (id) => {
-    try {
-      const res = await api.get(`/api/reports/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-      setActiveReport(res.data.report_data);
-      setActiveReportId(id);
-    } catch (err) { console.log(err); }
-  };
-
-  const deleteReport = async (id) => {
-    if (!window.confirm(`Delete report #${id}?`)) return;
-    try {
-      await api.delete(`/api/reports/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-      setMsg({ type: "ok", text: "Report deleted" });
-      if (activeReportId === id) { setActiveReport(null); setActiveReportId(null); }
-      loadReports();
-    } catch (err) {
-      setMsg({ type: "err", text: err.response?.data?.message || "Failed to delete" });
+    let compliance_status = "Pending";
+    if (eeoi !== null) {
+      compliance_status = eeoi <= 15 ? "Compliant" : "Non-Compliant";
     }
-  };
 
-  const downloadPdf = (id) => {
-    const baseUrl = process.env.REACT_APP_API_URL || "";
-    const url = `${baseUrl}/api/reports/${id}/pdf`;
-    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => res.blob())
-      .then((blob) => {
-        const blobUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = blobUrl;
-        a.download = `GreenFleet_Report_${id}.pdf`;
-        a.click();
-        window.URL.revokeObjectURL(blobUrl);
-      })
-      .catch((err) => console.log("PDF download error:", err));
-  };
+    const reportData = {
+      vessel: { name: vessel.name, imo_number: vessel.imo_number, vessel_type: vessel.vessel_type, flag_state: vessel.flag_state, gross_tonnage: vessel.gross_tonnage },
+      period: { start: period_start, end: period_end },
+      summary: {
+        voyage_count: stats.voyage_count,
+        total_co2: Number(Number(stats.total_co2).toFixed(3)),
+        total_nox: Number(Number(stats.total_nox).toFixed(3)),
+        total_sox: Number(Number(stats.total_sox).toFixed(3)),
+        total_fuel: Number(Number(stats.total_fuel).toFixed(3)),
+        total_distance: Number(Number(stats.total_distance).toFixed(2)),
+        avg_co2_per_voyage: Number(Number(stats.avg_co2_per_voyage).toFixed(3)),
+        eeoi: eeoi,
+      },
+      voyages: voyagesDetail.rows,
+      compliance_status: compliance_status,
+    };
 
-  const statusStyle = (status) => ({
-    padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700,
-    background: status === "Compliant" ? "#d7f0df" : status === "Non-Compliant" ? "#fde2e2" : "#fef3cd",
-    color: status === "Compliant" ? "#165a2a" : status === "Non-Compliant" ? "#8a1f1f" : "#856404",
-  });
+    const insertResult = await pool.query(
+      `INSERT INTO compliance_reports
+        (vessel_id, report_type, period_start, period_end, total_co2, total_nox,
+         total_sox, total_fuel, total_distance, compliance_status, report_data, generated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING id`,
+      [vessel_id, report_type || "DCS", period_start, period_end,
+       stats.total_co2, stats.total_nox, stats.total_sox, stats.total_fuel,
+       stats.total_distance, compliance_status, JSON.stringify(reportData), req.user.id]
+    );
 
-  return (
-    <div className="container">
-      <h1 className="h1">Compliance Reports</h1>
-      <p className="muted">Generate IMO DCS and EEXI compliance reports for individual vessels.</p>
+    await pool.query(
+      "INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details) VALUES ($1, $2, $3, $4, $5)",
+      [req.user.id, "GENERATE_REPORT", "compliance_report", insertResult.rows[0].id,
+       JSON.stringify({ vessel_name: vessel.name, report_type: report_type || "DCS" })]
+    );
 
-      {canGenerate && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <h2 className="h2">Generate New Report</h2>
-          {msg?.type === "err" && <div className="alert">{msg.text}</div>}
-          {msg?.type === "ok" && <div className="notice">{msg.text}</div>}
+    return res.status(201).json({ message: "Compliance report generated", reportId: insertResult.rows[0].id, report: reportData });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
 
-          <form onSubmit={generate} className="grid-2">
-            <div>
-              <label>Vessel</label>
-              <select value={form.vessel_id} onChange={(e) => setForm({ ...form, vessel_id: e.target.value })} required>
-                <option value="">Select vessel</option>
-                {vessels.map((v) => <option key={v.id} value={v.id}>{v.name} ({v.imo_number})</option>)}
-              </select>
-            </div>
-            <div>
-              <label>Report Type</label>
-              <select value={form.report_type} onChange={(e) => setForm({ ...form, report_type: e.target.value })}>
-                <option value="DCS">IMO DCS</option>
-                <option value="EEXI">EEXI</option>
-                <option value="Fleet Summary">Fleet Summary</option>
-              </select>
-            </div>
-            <div>
-              <label>Period Start</label>
-              <input type="date" value={form.period_start} onChange={(e) => setForm({ ...form, period_start: e.target.value })} required />
-            </div>
-            <div>
-              <label>Period End</label>
-              <input type="date" value={form.period_end} onChange={(e) => setForm({ ...form, period_end: e.target.value })} required />
-            </div>
-            <div style={{ gridColumn: "1 / -1" }}>
-              <button className="btn" type="submit" disabled={loading}>{loading ? "Generating..." : "Generate Report"}</button>
-            </div>
-          </form>
-        </div>
-      )}
+// ------------------------------------------------------------------
+// GET /api/reports — List all reports
+// ------------------------------------------------------------------
+router.get("/", authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT cr.id, cr.report_type, cr.period_start, cr.period_end,
+              cr.total_co2, cr.compliance_status, cr.generated_at,
+              v.name AS vessel_name, v.imo_number
+       FROM compliance_reports cr
+       JOIN vessels v ON v.id = cr.vessel_id
+       ORDER BY cr.generated_at DESC`
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
 
-      {activeReport && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <h2 className="h2" style={{ margin: 0 }}>{activeReport.vessel?.name} — Compliance Report</h2>
-            <button className="btn btn-ghost" onClick={() => downloadPdf(activeReportId)}>Download PDF</button>
-          </div>
+// ------------------------------------------------------------------
+// GET /api/reports/:id — Single report with full data
+// ------------------------------------------------------------------
+router.get("/:id", authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT cr.*, v.name AS vessel_name, v.imo_number
+       FROM compliance_reports cr
+       JOIN vessels v ON v.id = cr.vessel_id
+       WHERE cr.id = $1`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: "Report not found" });
+    const report = result.rows[0];
+    if (report.report_data && typeof report.report_data === "string") {
+      report.report_data = JSON.parse(report.report_data);
+    }
+    return res.json(report);
+  } catch (err) {
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
 
-          <div className="grid-2" style={{ marginBottom: 16 }}>
-            <div>
-              <p className="muted" style={{ margin: "0 0 4px" }}>IMO Number: {activeReport.vessel?.imo_number}</p>
-              <p className="muted" style={{ margin: "0 0 4px" }}>Vessel Type: {activeReport.vessel?.vessel_type || "N/A"}</p>
-              <p className="muted" style={{ margin: "0 0 4px" }}>Flag State: {activeReport.vessel?.flag_state || "N/A"}</p>
-              <p className="muted" style={{ margin: 0 }}>Gross Tonnage: {activeReport.vessel?.gross_tonnage || "N/A"} GT</p>
-            </div>
-            <div>
-              <p className="muted" style={{ margin: "0 0 4px" }}>Period: {activeReport.period?.start} to {activeReport.period?.end}</p>
-              <p className="muted" style={{ margin: "0 0 4px" }}>Voyages: {activeReport.summary?.voyage_count}</p>
-              <p className="muted" style={{ margin: "0 0 4px" }}>EEOI: {activeReport.summary?.eeoi ?? "N/A"} g CO2/t·nm</p>
-              <p style={{ margin: 0 }}><span style={statusStyle(activeReport.compliance_status)}>{activeReport.compliance_status}</span></p>
-            </div>
-          </div>
+// ------------------------------------------------------------------
+// DELETE /api/reports/:id — Delete a single report
+// ------------------------------------------------------------------
+router.delete("/:id", authenticateToken, authorizeRoles("Admin", "Sustainability Officer"), async (req, res) => {
+  try {
+    const result = await pool.query(
+      "DELETE FROM compliance_reports WHERE id = $1 RETURNING id",
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: "Report not found" });
 
-          <div className="grid-3" style={{ marginBottom: 16 }}>
-            <div className="stat" style={{ border: "1px solid var(--border)", borderRadius: 14 }}>
-              <div className="stat-k">Total CO2</div><div className="stat-v">{activeReport.summary?.total_co2} t</div>
-            </div>
-            <div className="stat" style={{ border: "1px solid var(--border)", borderRadius: 14 }}>
-              <div className="stat-k">Total NOx</div><div className="stat-v">{activeReport.summary?.total_nox} t</div>
-            </div>
-            <div className="stat" style={{ border: "1px solid var(--border)", borderRadius: 14 }}>
-              <div className="stat-k">Total SOx</div><div className="stat-v">{activeReport.summary?.total_sox} t</div>
-            </div>
-          </div>
+    await pool.query(
+      "INSERT INTO audit_logs (user_id, action, entity_type, entity_id) VALUES ($1, $2, $3, $4)",
+      [req.user.id, "DELETE_REPORT", "compliance_report", req.params.id]
+    );
 
-          {activeReport.voyages && activeReport.voyages.length > 0 && (
-            <>
-              <h2 className="h2">Voyage Breakdown</h2>
-              <table className="table">
-                <thead><tr><th>Date</th><th>Route</th><th>Distance (nm)</th><th>Fuel (t)</th><th>CO2 (t)</th><th>NOx (t)</th><th>SOx (t)</th></tr></thead>
-                <tbody>
-                  {activeReport.voyages.map((v) => (
-                    <tr key={v.id}>
-                      <td>{v.voyage_date || "\u2014"}</td>
-                      <td>{v.departure_port || "\u2014"} \u2192 {v.arrival_port || "\u2014"}</td>
-                      <td>{v.distance_nm}</td><td>{v.fuel_tons}</td>
-                      <td>{v.co2_tons}</td><td>{v.nox_tons}</td><td>{v.sox_tons}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
-        </div>
-      )}
+    return res.json({ message: "Report deleted" });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
 
-      <div className="card">
-        <h2 className="h2">Previous Reports</h2>
-        {reports.length === 0 && <p className="muted">No reports generated yet.</p>}
-        <table className="table">
-          <thead><tr><th>ID</th><th>Vessel</th><th>Type</th><th>Period</th><th>CO2</th><th>Status</th><th></th></tr></thead>
-          <tbody>
-            {reports.map((r) => (
-              <tr key={r.id}>
-                <td>#{r.id}</td>
-                <td>{r.vessel_name}</td>
-                <td>{r.report_type}</td>
-                <td>{r.period_start} — {r.period_end}</td>
-                <td>{Number(r.total_co2).toFixed(2)} t</td>
-                <td><span style={statusStyle(r.compliance_status)}>{r.compliance_status}</span></td>
-                <td style={{ whiteSpace: "nowrap" }}>
-                  <button className="btn btn-ghost" style={{ marginRight: 4 }} onClick={() => viewReport(r.id)}>View</button>
-                  {canDelete && (
-                    <button className="btn btn-ghost" style={{ color: "#8a1f1f" }} onClick={() => deleteReport(r.id)}>Delete</button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
+// ------------------------------------------------------------------
+// GET /api/reports/:id/pdf — Download report as PDF
+// ------------------------------------------------------------------
+router.get("/:id/pdf", authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT cr.*, v.name AS vessel_name, v.imo_number
+       FROM compliance_reports cr
+       JOIN vessels v ON v.id = cr.vessel_id
+       WHERE cr.id = $1`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: "Report not found" });
+
+    const report = result.rows[0];
+    let data = report.report_data;
+    if (typeof data === "string") data = JSON.parse(data);
+
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=GreenFleet_Report_${report.id}.pdf`);
+    doc.pipe(res);
+
+    doc.fontSize(22).font("Helvetica-Bold").text("GreenFleet", { align: "center" });
+    doc.fontSize(10).font("Helvetica").text("Carbon Emission Management System for Maritime Vessels", { align: "center" });
+    doc.moveDown(0.5);
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke("#cccccc");
+    doc.moveDown(1);
+
+    doc.fontSize(16).font("Helvetica-Bold").text(`${report.report_type} Compliance Report`, { align: "center" });
+    doc.moveDown(0.5);
+
+    doc.fontSize(12).font("Helvetica-Bold").text("Vessel Information");
+    doc.moveDown(0.3);
+    doc.fontSize(10).font("Helvetica");
+    doc.text(`Vessel Name: ${data.vessel?.name || report.vessel_name}`);
+    doc.text(`IMO Number: ${data.vessel?.imo_number || report.imo_number}`);
+    doc.text(`Vessel Type: ${data.vessel?.vessel_type || "N/A"}`);
+    doc.text(`Flag State: ${data.vessel?.flag_state || "N/A"}`);
+    doc.text(`Gross Tonnage: ${data.vessel?.gross_tonnage || "N/A"} GT`);
+    doc.moveDown(1);
+
+    doc.fontSize(12).font("Helvetica-Bold").text("Reporting Period");
+    doc.moveDown(0.3);
+    doc.fontSize(10).font("Helvetica");
+    doc.text(`Start: ${report.period_start}`);
+    doc.text(`End: ${report.period_end}`);
+    doc.text(`Report Generated: ${new Date(report.generated_at).toLocaleString()}`);
+    doc.moveDown(1);
+
+    doc.fontSize(12).font("Helvetica-Bold").text("Emission Summary");
+    doc.moveDown(0.3);
+    doc.fontSize(10).font("Helvetica");
+    doc.text(`Total Voyages: ${data.summary?.voyage_count || 0}`);
+    doc.text(`Total Distance: ${data.summary?.total_distance || 0} nautical miles`);
+    doc.text(`Total Fuel Consumed: ${data.summary?.total_fuel || 0} tonnes`);
+    doc.moveDown(0.3);
+    doc.text(`Total CO\u2082 Emissions: ${data.summary?.total_co2 || 0} tonnes`);
+    doc.text(`Total NOx Emissions: ${data.summary?.total_nox || 0} tonnes`);
+    doc.text(`Total SOx Emissions: ${data.summary?.total_sox || 0} tonnes`);
+    doc.text(`Average CO\u2082 per Voyage: ${data.summary?.avg_co2_per_voyage || 0} tonnes`);
+    doc.moveDown(0.5);
+    doc.text(`EEOI: ${data.summary?.eeoi ?? "N/A"} g CO\u2082/t\u00b7nm`);
+    doc.moveDown(1);
+
+    const status = data.compliance_status || report.compliance_status || "Pending";
+    doc.fontSize(12).font("Helvetica-Bold").text("Compliance Status");
+    doc.moveDown(0.3);
+    doc.fontSize(14).font("Helvetica-Bold");
+    if (status === "Compliant") doc.fillColor("green");
+    else if (status === "Non-Compliant") doc.fillColor("red");
+    else doc.fillColor("orange");
+    doc.text(status);
+    doc.fillColor("black");
+    doc.moveDown(1);
+
+    if (data.voyages && data.voyages.length > 0) {
+      doc.fontSize(12).font("Helvetica-Bold").text("Voyage Breakdown");
+      doc.moveDown(0.5);
+      const tableTop = doc.y;
+      const col = { date: 50, route: 120, dist: 260, fuel: 330, co2: 400, nox: 460, sox: 510 };
+      doc.fontSize(8).font("Helvetica-Bold");
+      doc.text("Date", col.date, tableTop);
+      doc.text("Route", col.route, tableTop);
+      doc.text("Dist (nm)", col.dist, tableTop);
+      doc.text("Fuel (t)", col.fuel, tableTop);
+      doc.text("CO2 (t)", col.co2, tableTop);
+      doc.text("NOx (t)", col.nox, tableTop);
+      doc.text("SOx (t)", col.sox, tableTop);
+      doc.moveTo(50, tableTop + 14).lineTo(555, tableTop + 14).stroke("#cccccc");
+      let y = tableTop + 20;
+      doc.fontSize(8).font("Helvetica");
+      for (const v of data.voyages) {
+        if (y > 750) { doc.addPage(); y = 50; }
+        const route = `${v.departure_port || "-"} > ${v.arrival_port || "-"}`;
+        doc.text(v.voyage_date || "-", col.date, y, { width: 65 });
+        doc.text(route, col.route, y, { width: 130 });
+        doc.text(String(v.distance_nm), col.dist, y);
+        doc.text(String(v.fuel_tons), col.fuel, y);
+        doc.text(String(v.co2_tons), col.co2, y);
+        doc.text(String(v.nox_tons), col.nox, y);
+        doc.text(String(v.sox_tons), col.sox, y);
+        y += 16;
+      }
+    }
+
+    doc.moveDown(2);
+    doc.fontSize(8).font("Helvetica").fillColor("#999999");
+    doc.text(
+      "This report was generated by GreenFleet in alignment with IMO Data Collection System (DCS) and EEXI reporting guidelines. " +
+      "Emission factors are based on the IMO Fourth GHG Study 2020.",
+      50, doc.y, { width: 500, align: "center" }
+    );
+    doc.end();
+  } catch (err) {
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+module.exports = router;
