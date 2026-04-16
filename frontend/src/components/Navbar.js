@@ -19,13 +19,12 @@ export default function Navbar({ role, username, onLogout }) {
         </div>
         <div className="nav-links">
           <Link to="/dashboard">Dashboard</Link>
-          {canWrite && <Link to="/vessels/new">Add Vessel</Link>}
-          {canWrite && <Link to="/voyages/new">Add Voyage</Link>}
+          <Link to="/vessels">Vessels</Link>
           {canWrite && <Link to="/voyages/import">Import CSV</Link>}
           {canRecommend && <Link to="/recommendations">Recommendations</Link>}
           <Link to="/reports">Reports</Link>
           <Link to="/alerts">Alerts</Link>
-          {isAdmin && <Link to="/users/new">Users</Link>}
+          {isAdmin && <Link to="/users">Users</Link>}
           {isAdmin && <Link to="/audit-logs">Audit Logs</Link>}
           <span style={{ fontSize: 13, color: "var(--muted)" }}>{username}</span>
           <button className="btn btn-ghost" onClick={logout}>Logout</button>

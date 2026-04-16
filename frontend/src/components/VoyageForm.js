@@ -7,7 +7,7 @@ export default function VoyageForm({ token }) {
   const [vessels, setVessels] = useState([]);
   const [form, setForm] = useState({
     vessel_id: "", departure_port: "", arrival_port: "",
-    voyage_date: "", distance_nm: "", duration_hours: "",
+    voyage_date: "", distance_nm: "", duration_days: "",
     fuel_type: "HFO", fuel_tons: "",
   });
   const [msg, setMsg] = useState(null);
@@ -26,7 +26,7 @@ export default function VoyageForm({ token }) {
       const em = res.data?.emissions;
       setMsg({
         type: "ok",
-        text: `Voyage saved. Emissions: CO₂ ${em?.co2_tons}t, NOx ${em?.nox_tons}t, SOx ${em?.sox_tons}t`,
+        text: `Voyage saved. Emissions: CO2 ${em?.co2_tons}t, NOx ${em?.nox_tons}t, SOx ${em?.sox_tons}t`,
       });
       setTimeout(() => navigate("/dashboard"), 1200);
     } catch (err) {
@@ -40,7 +40,7 @@ export default function VoyageForm({ token }) {
     <div className="container">
       <div className="card" style={{ maxWidth: 760, margin: "24px auto" }}>
         <h1 className="h1">Record Voyage</h1>
-        <p className="muted">Enter voyage details. Emissions (CO₂, NOx, SOx) are calculated automatically using IMO emission factors.</p>
+        <p className="muted">Enter voyage details. Emissions (CO2, NOx, SOx) are calculated automatically using IMO emission factors.</p>
 
         {msg?.type === "err" && <div className="alert">{msg.text}</div>}
         {msg?.type === "ok" && <div className="notice">{msg.text}</div>}
@@ -74,8 +74,8 @@ export default function VoyageForm({ token }) {
             <input type="number" value={form.distance_nm} onChange={set("distance_nm")} required />
           </div>
           <div>
-            <label>Duration (hours)</label>
-            <input type="number" step="0.1" value={form.duration_hours} onChange={set("duration_hours")} />
+            <label>Duration (days)</label>
+            <input type="number" step="0.1" value={form.duration_days} onChange={set("duration_days")} placeholder="e.g. 3.5" />
           </div>
 
           <div>

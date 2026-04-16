@@ -4,9 +4,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./components/Login";
 import SetupAdmin from "./components/SetupAdmin";
 import Dashboard from "./components/Dashboard";
+import Vessels from "./components/Vessels";
 import VesselForm from "./components/VesselForm";
 import VoyageForm from "./components/VoyageForm";
-import CreateUser from "./components/CreateUser";
+import Users from "./components/Users";
 import Recommendations from "./components/Recommendations";
 import Reports from "./components/Reports";
 import Alerts from "./components/Alerts";
@@ -19,6 +20,19 @@ export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [role, setRole] = useState(localStorage.getItem("role") || "");
   const [username, setUsername] = useState(localStorage.getItem("username") || "");
+  const [currentUserId, setCurrentUserId] = useState(null);
+
+  // Decode token to get current user's ID (so we can prevent self-delete)
+  useEffect(() => {
+    if (token) {
+      try {
+        const decoded = JSON.parse(atob(token.split(".")[1]));
+        setCurrentUserId(decoded.id);
+      } catch (err) { setCurrentUserId(null); }
+    } else {
+      setCurrentUserId(null);
+    }
+  }, [token]);
 
   const onLogin = (t, r, u) => {
     const cleanRole = (r || "").trim();
@@ -39,18 +53,8 @@ export default function App() {
     localStorage.removeItem("username");
   };
 
-  useEffect(() => {
-    const t = localStorage.getItem("token") || "";
-    const r = localStorage.getItem("role") || "";
-    const u = localStorage.getItem("username") || "";
-    if (t !== token) setToken(t);
-    if (r !== role) setRole(r);
-    if (u !== username) setUsername(u);
-  }, []);
-
   const canWrite = ["Admin", "Sustainability Officer", "Manager"].includes(role);
   const canRecommend = ["Admin", "Sustainability Officer"].includes(role);
-  const isAdmin = role === "Admin";
 
   const denied = (msg) => (
     <div className="container"><div className="card alert">{msg}</div></div>
@@ -66,6 +70,11 @@ export default function App() {
 
         <Route path="/dashboard" element={
           <ProtectedRoute token={token}><Dashboard token={token} role={role} /></ProtectedRoute>
+        } />
+
+        {/* Vessels list - all logged-in users can view; write actions gated inside component */}
+        <Route path="/vessels" element={
+          <ProtectedRoute token={token}><Vessels token={token} role={role} /></ProtectedRoute>
         } />
 
         <Route path="/vessels/new" element={
@@ -100,8 +109,9 @@ export default function App() {
           <ProtectedRoute token={token}><Alerts token={token} /></ProtectedRoute>
         } />
 
-        <Route path="/users/new" element={
-          <ProtectedRoute token={token}><CreateUser token={token} role={role} /></ProtectedRoute>
+        {/* Users page - Admin only */}
+        <Route path="/users" element={
+          <ProtectedRoute token={token}><Users token={token} role={role} currentUserId={currentUserId} /></ProtectedRoute>
         } />
 
         <Route path="/audit-logs" element={
