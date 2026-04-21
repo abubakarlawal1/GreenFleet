@@ -3,8 +3,7 @@ const router = express.Router();
 const pool = require("../config/db");
 const { authenticateToken, authorizeRoles } = require("../middleware/authMiddleware");
 
-// ------------------------------------------------------------------
-// Green technology knowledge base
+
 // Each rule checks vessel characteristics and emission data to suggest
 // appropriate emission-reduction technologies
 // Sources: IMO Fourth GHG Study 2020, DNV Maritime Forecast 2023
@@ -108,9 +107,6 @@ const TECHNOLOGY_DATABASE = [
 
 // ------------------------------------------------------------------
 // POST /api/recommendations/generate/:vesselId
-// Generate recommendations for a specific vessel
-// Roles: Admin, Sustainability Officer
-// ------------------------------------------------------------------
 router.post("/generate/:vesselId", authenticateToken, authorizeRoles("Admin", "Sustainability Officer"), async (req, res) => {
   const vesselId = req.params.vesselId;
 
@@ -185,11 +181,7 @@ router.post("/generate/:vesselId", authenticateToken, authorizeRoles("Admin", "S
   }
 });
 
-// ------------------------------------------------------------------
-// GET /api/recommendations/:vesselId
 // Get stored recommendations for a vessel
-// Roles: Admin, Sustainability Officer
-// ------------------------------------------------------------------
 router.get("/:vesselId", authenticateToken, authorizeRoles("Admin", "Sustainability Officer"), async (req, res) => {
   try {
     const result = await pool.query(
@@ -206,11 +198,7 @@ router.get("/:vesselId", authenticateToken, authorizeRoles("Admin", "Sustainabil
   }
 });
 
-// ------------------------------------------------------------------
-// GET /api/recommendations
 // Get all recommendations across fleet
-// Roles: Admin, Sustainability Officer
-// ------------------------------------------------------------------
 router.get("/", authenticateToken, authorizeRoles("Admin", "Sustainability Officer"), async (req, res) => {
   try {
     const result = await pool.query(
