@@ -100,14 +100,31 @@ export default function Vessels({ token, role }) {
                   <td><input value={editForm.flag_state} onChange={(e) => setEditForm({ ...editForm, flag_state: e.target.value })} style={{ padding: 4 }} /></td>
                   <td><input type="number" value={editForm.gross_tonnage} onChange={(e) => setEditForm({ ...editForm, gross_tonnage: e.target.value })} style={{ padding: 4, width: 80 }} /></td>
                   <td>
-                    <select value={editForm.fuel_type} onChange={(e) => setEditForm({ ...editForm, fuel_type: e.target.value })} style={{ padding: 4 }}>
-                      <option>HFO</option>
-                      <option>VLSFO</option>
-                      <option>MDO</option>
-                      <option>MGO</option>
-                      <option>LSMGO</option>
-                      <option>LNG</option>
-                    </select>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: 4 }}>
+                      {["HFO", "VLSFO", "MDO", "MGO", "LSMGO", "LNG"].map((fuel) => {
+                        const selected = (editForm.fuel_type || "").split(",").filter(Boolean);
+                        const isChecked = selected.includes(fuel);
+                        return (
+                          <label key={fuel} style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 12, cursor: "pointer" }}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                let updated;
+                                if (e.target.checked) {
+                                  updated = [...selected, fuel];
+                                } else {
+                                  updated = selected.filter((f) => f !== fuel);
+                                }
+                                setEditForm({ ...editForm, fuel_type: updated.join(",") });
+                              }}
+                              style={{ transform: "scale(0.85)" }}
+                            />
+                            {fuel}
+                          </label>
+                        );
+                      })}
+                    </div>
                   </td>
                   <td><input value={editForm.engine_type} onChange={(e) => setEditForm({ ...editForm, engine_type: e.target.value })} style={{ padding: 4 }} /></td>
                   {canWrite && (
@@ -124,7 +141,7 @@ export default function Vessels({ token, role }) {
                   <td>{v.vessel_type || "—"}</td>
                   <td>{v.flag_state || "—"}</td>
                   <td>{v.gross_tonnage || "—"}</td>
-                  <td>{v.fuel_type || "—"}</td>
+                  <td>{v.fuel_type ? v.fuel_type.split(",").join(", ") : "—"}</td>
                   <td>{v.engine_type || "—"}</td>
                   {canWrite && (
                     <td style={{ whiteSpace: "nowrap" }}>

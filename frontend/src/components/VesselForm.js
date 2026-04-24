@@ -6,7 +6,7 @@ export default function VesselForm({ token }) {
   const navigate = useNavigate();
   const [form, setForm] = useState({
     name: "", imo_number: "", vessel_type: "", flag_state: "",
-    gross_tonnage: "", fuel_type: "VLSFO", engine_type: "",
+    gross_tonnage: "", fuel_type: "", engine_type: "",
     fuel_capacity: "", avg_speed: "",
   });
   const [msg, setMsg] = useState(null);
@@ -66,17 +66,33 @@ export default function VesselForm({ token }) {
             <label>Gross Tonnage (GT)</label>
             <input type="number" value={form.gross_tonnage} onChange={set("gross_tonnage")} placeholder="e.g. 45000" />
           </div>
-          <div>
-            <label>Default Fuel Type</label>
-            <select value={form.fuel_type} onChange={set("fuel_type")}>
-              <option>HFO</option>
-              <option>VLSFO</option>
-              <option>MDO</option>
-              <option>LSMGO</option>
-              <option>MGO</option>
-              <option>LNG</option>
-            </select>
-          </div>
+            <div>
+              <label>Default Fuel Type(s)</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, padding: "8px 0" }}>
+                {["HFO", "VLSFO", "MDO", "MGO", "LSMGO", "LNG"].map((fuel) => {
+                  const selected = (form.fuel_type || "").split(",").filter(Boolean);
+                  const isChecked = selected.includes(fuel);
+                  return (
+                    <label key={fuel} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 400 }}>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          let updated;
+                          if (e.target.checked) {
+                            updated = [...selected, fuel];
+                          } else {
+                            updated = selected.filter((f) => f !== fuel);
+                          }
+                          setForm({ ...form, fuel_type: updated.join(",") });
+                        }}
+                      />
+                      {fuel}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
 
           <div>
             <label>Engine Type</label>
