@@ -8,10 +8,15 @@ const { Readable } = require("stream");
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-// ------------------------------------------------------------------
 // Emission factors - Source: IMO Fourth GHG Study 2020, Table 1
-// ------------------------------------------------------------------
-const CO2_FACTOR = { HFO: 3.114, MDO: 3.206, MGO: 3.206, LNG: 2.750 };
+const CO2_FACTOR = { 
+  HFO: 3.114, 
+  VLSFO: 3.151, 
+  MDO: 3.206, 
+  MGO: 3.206, 
+  LSMGO: 3.206, 
+  LNG: 2.750 
+};
 const NOX_FACTOR = 0.07;
 const SOX_FACTOR = 0.02;
 
@@ -27,9 +32,7 @@ function computeEmissions(fuel_type, fuel_tons) {
 
 const CO2_ALERT_THRESHOLD = 200;
 
-// ------------------------------------------------------------------
 // POST /api/voyages - Create voyage with auto-calculated emissions
-// ------------------------------------------------------------------
 router.post("/", authenticateToken, authorizeRoles("Admin", "Sustainability Officer", "Manager"), async (req, res) => {
   const { vessel_id, departure_port, arrival_port, voyage_date, distance_nm, duration_days, fuel_type, fuel_tons } = req.body;
 
@@ -77,9 +80,7 @@ router.post("/", authenticateToken, authorizeRoles("Admin", "Sustainability Offi
   }
 });
 
-// ------------------------------------------------------------------
 // GET /api/voyages - List all voyages
-// ------------------------------------------------------------------
 router.get("/", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
@@ -94,10 +95,8 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------------
 // GET /api/voyages/summary - Dashboard summary
 // Supports optional ?vessel_id=X filter for per-vessel stats
-// ------------------------------------------------------------------
 router.get("/summary", authenticateToken, async (req, res) => {
   try {
     const vesselId = req.query.vessel_id;
@@ -132,9 +131,7 @@ router.get("/summary", authenticateToken, async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------------
 // GET /api/voyages/by-vessel/:vesselId
-// ------------------------------------------------------------------
 router.get("/by-vessel/:vesselId", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
@@ -151,9 +148,7 @@ router.get("/by-vessel/:vesselId", authenticateToken, async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------------
 // DELETE /api/voyages/:id - Delete a voyage
-// ------------------------------------------------------------------
 router.delete("/:id", authenticateToken, authorizeRoles("Admin", "Sustainability Officer", "Manager"), async (req, res) => {
   try {
     const result = await pool.query(
@@ -173,9 +168,7 @@ router.delete("/:id", authenticateToken, authorizeRoles("Admin", "Sustainability
   }
 });
 
-// ------------------------------------------------------------------
 // POST /api/voyages/import/csv - Bulk CSV import
-// ------------------------------------------------------------------
 router.post("/import/csv", authenticateToken, authorizeRoles("Admin", "Sustainability Officer", "Manager"), upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ message: "No CSV file uploaded. Use form field name 'file'." });
 

@@ -1,10 +1,7 @@
--- ============================================================
 -- GreenFleet – PostgreSQL Schema (FYD)
--- A Web-Based Carbon Emission Management System for Maritime Vessels
--- ============================================================
+
 
 -- 1. USERS
--- Roles: Admin, Sustainability Officer, Manager, Viewer
 CREATE TABLE IF NOT EXISTS users (
   id            SERIAL PRIMARY KEY,
   username      VARCHAR(80)  NOT NULL UNIQUE,
@@ -17,7 +14,6 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- 2. VESSELS
--- Core vessel registry with IMO-relevant fields
 CREATE TABLE IF NOT EXISTS vessels (
   id            SERIAL PRIMARY KEY,
   name          VARCHAR(120) NOT NULL,
@@ -35,7 +31,6 @@ CREATE TABLE IF NOT EXISTS vessels (
 );
 
 -- 3. VOYAGES
--- Individual voyage records with emission outputs
 CREATE TABLE IF NOT EXISTS voyages (
   id              SERIAL PRIMARY KEY,
   vessel_id       INT NOT NULL REFERENCES vessels(id) ON DELETE CASCADE,
@@ -55,7 +50,6 @@ CREATE TABLE IF NOT EXISTS voyages (
 );
 
 -- 4. RECOMMENDATIONS
--- Rule-based green technology suggestions linked to vessels
 CREATE TABLE IF NOT EXISTS recommendations (
   id              SERIAL PRIMARY KEY,
   vessel_id       INT NOT NULL REFERENCES vessels(id) ON DELETE CASCADE,
@@ -69,7 +63,6 @@ CREATE TABLE IF NOT EXISTS recommendations (
 );
 
 -- 5. COMPLIANCE REPORTS
--- Generated reports aligned with IMO DCS / EEXI
 CREATE TABLE IF NOT EXISTS compliance_reports (
   id              SERIAL PRIMARY KEY,
   vessel_id       INT REFERENCES vessels(id) ON DELETE SET NULL,
@@ -90,7 +83,6 @@ CREATE TABLE IF NOT EXISTS compliance_reports (
 );
 
 -- 6. ALERTS
--- Emission anomalies and compliance warnings
 CREATE TABLE IF NOT EXISTS alerts (
   id              SERIAL PRIMARY KEY,
   vessel_id       INT REFERENCES vessels(id) ON DELETE CASCADE,
@@ -105,7 +97,6 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 
 -- 7. AUDIT LOGS
--- Track user actions for accountability (Admin-visible)
 CREATE TABLE IF NOT EXISTS audit_logs (
   id              SERIAL PRIMARY KEY,
   user_id         INT REFERENCES users(id) ON DELETE SET NULL,
@@ -117,10 +108,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ============================================================
+
 -- INDEXES for query performance
--- ============================================================
-CREATE INDEX idx_voyages_vessel     ON voyages(vessel_id);
 CREATE INDEX idx_voyages_date       ON voyages(voyage_date);
 CREATE INDEX idx_recommendations_vessel ON recommendations(vessel_id);
 CREATE INDEX idx_alerts_vessel      ON alerts(vessel_id);

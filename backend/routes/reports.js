@@ -4,9 +4,7 @@ const pool = require("../config/db");
 const { authenticateToken, authorizeRoles } = require("../middleware/authMiddleware");
 const PDFDocument = require("pdfkit");
 
-// ------------------------------------------------------------------
 // POST /api/reports/generate
-// ------------------------------------------------------------------
 router.post("/generate", authenticateToken, authorizeRoles("Admin", "Sustainability Officer"), async (req, res) => {
   const { vessel_id, report_type, period_start, period_end } = req.body;
   if (!vessel_id || !period_start || !period_end) {
@@ -95,9 +93,7 @@ router.post("/generate", authenticateToken, authorizeRoles("Admin", "Sustainabil
   }
 });
 
-// ------------------------------------------------------------------
 // GET /api/reports — List all reports
-// ------------------------------------------------------------------
 router.get("/", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
@@ -114,9 +110,7 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------------
 // GET /api/reports/:id — Single report with full data
-// ------------------------------------------------------------------
 router.get("/:id", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
@@ -137,9 +131,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------------
 // DELETE /api/reports/:id — Delete a single report
-// ------------------------------------------------------------------
 router.delete("/:id", authenticateToken, authorizeRoles("Admin", "Sustainability Officer"), async (req, res) => {
   try {
     const result = await pool.query(
@@ -159,9 +151,7 @@ router.delete("/:id", authenticateToken, authorizeRoles("Admin", "Sustainability
   }
 });
 
-// ------------------------------------------------------------------
 // GET /api/reports/:id/pdf — Download report as PDF
-// ------------------------------------------------------------------
 router.get("/:id/pdf", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(

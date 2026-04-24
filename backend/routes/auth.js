@@ -7,9 +7,7 @@ const { authenticateToken, authorizeRoles } = require("../middleware/authMiddlew
 
 const ALLOWED_ROLES = ["Admin", "Sustainability Officer", "Manager", "Viewer"];
 
-// ------------------------------------------------------------------
-// POST /api/auth/bootstrap — Create first Admin (only if no users exist)
-// ------------------------------------------------------------------
+// POST /api/auth/bootstrap — Create first Admin 
 router.post("/bootstrap", async (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !password) {
@@ -39,9 +37,8 @@ router.post("/bootstrap", async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------------
+
 // POST /api/auth/login — Authenticate user and return JWT
-// ------------------------------------------------------------------
 router.post("/login", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
@@ -79,9 +76,8 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------------
+
 // GET /api/auth/me — Get current user info from token
-// ------------------------------------------------------------------
 router.get("/me", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
@@ -95,9 +91,8 @@ router.get("/me", authenticateToken, async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------------
+
 // POST /api/auth/users — Admin creates a new user
-// ------------------------------------------------------------------
 router.post("/users", authenticateToken, authorizeRoles("Admin"), async (req, res) => {
   const { username, email, password, role } = req.body;
   if (!username || !password || !role) {
@@ -132,9 +127,7 @@ router.post("/users", authenticateToken, authorizeRoles("Admin"), async (req, re
   }
 });
 
-// ------------------------------------------------------------------
 // GET /api/auth/users — Admin lists all users
-// ------------------------------------------------------------------
 router.get("/users", authenticateToken, authorizeRoles("Admin"), async (req, res) => {
   try {
     const result = await pool.query(
@@ -146,9 +139,7 @@ router.get("/users", authenticateToken, authorizeRoles("Admin"), async (req, res
   }
 });
 
-// ------------------------------------------------------------------
 // PUT /api/auth/users/:id — Admin updates a user's role
-// ------------------------------------------------------------------
 router.put("/users/:id", authenticateToken, authorizeRoles("Admin"), async (req, res) => {
   const { role } = req.body;
   const userId = req.params.id;
@@ -176,9 +167,7 @@ router.put("/users/:id", authenticateToken, authorizeRoles("Admin"), async (req,
   }
 });
 
-// ------------------------------------------------------------------
 // DELETE /api/auth/users/:id — Admin deletes a user
-// ------------------------------------------------------------------
 router.delete("/users/:id", authenticateToken, authorizeRoles("Admin"), async (req, res) => {
   const userId = req.params.id;
 

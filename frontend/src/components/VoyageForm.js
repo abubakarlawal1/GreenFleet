@@ -10,7 +10,7 @@ export default function VoyageForm({ token }) {
   const [form, setForm] = useState({
     vessel_id: "", departure_port: "", arrival_port: "",
     voyage_date: "", distance_nm: "", duration_days: "",
-    fuel_type: "HFO", fuel_tons: "",
+    fuel_type: "VLSFO", fuel_tons: "",
   });
   const [msg, setMsg] = useState(null);
 
@@ -95,9 +95,14 @@ export default function VoyageForm({ token }) {
               <div><label>Duration (days)</label><input type="number" step="0.1" value={form.duration_days} onChange={set("duration_days")} placeholder="e.g. 3.5" /></div>
               <div>
                 <label>Fuel Type</label>
-                <select value={form.fuel_type} onChange={set("fuel_type")}>
-                  <option>HFO</option><option>MDO</option><option>MGO</option><option>LNG</option>
-                </select>
+              <select value={form.fuel_type} onChange={set("fuel_type")}>
+                <option>HFO</option>
+                <option>VLSFO</option>
+                <option>MDO</option>
+                <option>MGO</option>
+                <option>LSMGO</option>
+                <option>LNG</option>
+              </select>
               </div>
               <div><label>Fuel Consumed (tonnes)</label><input type="number" step="0.001" value={form.fuel_tons} onChange={set("fuel_tons")} required /></div>
               <div style={{ gridColumn: "1 / -1" }}><button className="btn" type="submit">Save Voyage</button></div>
@@ -109,8 +114,8 @@ export default function VoyageForm({ token }) {
           <>
             <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, fontFamily: "monospace", fontSize: 13, overflowX: "auto", marginBottom: 12 }}>
               vessel_id,departure_port,arrival_port,voyage_date,distance_nm,duration_days,fuel_type,fuel_tons<br/>
-              1,Southampton,Rotterdam,2025-11-15,350,2,HFO,45<br/>
-              1,Rotterdam,Hamburg,2025-12-01,280,1.5,HFO,38<br/>
+              1,Southampton,Rotterdam,2025-11-15,350,2,VLSFO,45<br/>
+              1,Rotterdam,Hamburg,2025-12-01,280,1.5,VLSFO,38<br/>
               2,Felixstowe,Antwerp,2025-11-20,180,1,MDO,32
             </div>
             <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>

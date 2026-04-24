@@ -6,7 +6,7 @@ export default function VesselForm({ token }) {
   const navigate = useNavigate();
   const [form, setForm] = useState({
     name: "", imo_number: "", vessel_type: "", flag_state: "",
-    gross_tonnage: "", fuel_type: "HFO", engine_type: "",
+    gross_tonnage: "", fuel_type: "VLSFO", engine_type: "",
     fuel_capacity: "", avg_speed: "",
   });
   const [msg, setMsg] = useState(null);
@@ -70,7 +70,9 @@ export default function VesselForm({ token }) {
             <label>Default Fuel Type</label>
             <select value={form.fuel_type} onChange={set("fuel_type")}>
               <option>HFO</option>
+              <option>VLSFO</option>
               <option>MDO</option>
+              <option>LSMGO</option>
               <option>MGO</option>
               <option>LNG</option>
             </select>

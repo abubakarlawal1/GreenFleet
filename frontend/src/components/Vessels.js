@@ -101,7 +101,12 @@ export default function Vessels({ token, role }) {
                   <td><input type="number" value={editForm.gross_tonnage} onChange={(e) => setEditForm({ ...editForm, gross_tonnage: e.target.value })} style={{ padding: 4, width: 80 }} /></td>
                   <td>
                     <select value={editForm.fuel_type} onChange={(e) => setEditForm({ ...editForm, fuel_type: e.target.value })} style={{ padding: 4 }}>
-                      <option>HFO</option><option>MDO</option><option>MGO</option><option>LNG</option>
+                      <option>HFO</option>
+                      <option>VLSFO</option>
+                      <option>MDO</option>
+                      <option>MGO</option>
+                      <option>LSMGO</option>
+                      <option>LNG</option>
                     </select>
                   </td>
                   <td><input value={editForm.engine_type} onChange={(e) => setEditForm({ ...editForm, engine_type: e.target.value })} style={{ padding: 4 }} /></td>

@@ -3,9 +3,7 @@ const router = express.Router();
 const pool = require("../config/db");
 const { authenticateToken, authorizeRoles } = require("../middleware/authMiddleware");
 
-// ------------------------------------------------------------------
 // POST /api/vessels — Create a new vessel (Admin, Sustainability Officer, Manager)
-// ------------------------------------------------------------------
 router.post("/", authenticateToken, authorizeRoles("Admin", "Sustainability Officer", "Manager"), async (req, res) => {
   const { name, imo_number, vessel_type, flag_state, gross_tonnage, fuel_type, engine_type, fuel_capacity, avg_speed } = req.body;
 
@@ -34,10 +32,7 @@ router.post("/", authenticateToken, authorizeRoles("Admin", "Sustainability Offi
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 });
-
-// ------------------------------------------------------------------
 // GET /api/vessels — List all vessels (all authenticated users)
-// ------------------------------------------------------------------
 router.get("/", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM vessels ORDER BY id DESC");
@@ -47,9 +42,7 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------------
 // GET /api/vessels/:id — Get a single vessel by ID
-// ------------------------------------------------------------------
 router.get("/:id", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM vessels WHERE id = $1", [req.params.id]);
@@ -60,9 +53,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------------
 // PUT /api/vessels/:id — Update a vessel (Admin, Sustainability Officer, Manager)
-// ------------------------------------------------------------------
 router.put("/:id", authenticateToken, authorizeRoles("Admin", "Sustainability Officer", "Manager"), async (req, res) => {
   const { name, imo_number, vessel_type, flag_state, gross_tonnage, fuel_type, engine_type, fuel_capacity, avg_speed } = req.body;
 
@@ -92,9 +83,7 @@ router.put("/:id", authenticateToken, authorizeRoles("Admin", "Sustainability Of
   }
 });
 
-// ------------------------------------------------------------------
 // DELETE /api/vessels/:id — Delete a vessel (Admin, Sustainability Officer, Manager)
-// ------------------------------------------------------------------
 router.delete("/:id", authenticateToken, authorizeRoles("Admin", "Sustainability Officer", "Manager"), async (req, res) => {
   try {
     const result = await pool.query(
