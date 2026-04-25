@@ -17,6 +17,39 @@ const CO2_FACTOR = {
   LSMGO: 3.206, 
   LNG: 2.750 
 };
+
+// Convert various date formats to PostgreSQL-friendly yyyy-mm-dd
+function normaliseDate(dateStr) {
+  if (!dateStr || typeof dateStr !== "string") return null;
+  const trimmed = dateStr.trim();
+  if (!trimmed) return null;
+
+  // Already yyyy-mm-dd? Just return it.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+
+  // dd/mm/yyyy or d/m/yyyy
+  const slashMatch = trimmed.match(/^(\d{1,2})[/](\d{1,2})[/](\d{4})$/);
+  if (slashMatch) {
+    const [, d, m, y] = slashMatch;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
+  // dd-mm-yyyy
+  const dashMatch = trimmed.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (dashMatch) {
+    const [, d, m, y] = dashMatch;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
+  // Last resort: let JavaScript try
+  const parsed = new Date(trimmed);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split("T")[0];
+  }
+
+  return null; 
+}
+
 const NOX_FACTOR = 0.07;
 const SOX_FACTOR = 0.02;
 
@@ -196,18 +229,35 @@ router.post("/import/csv", authenticateToken, authorizeRoles("Admin", "Sustainab
     const r = rows[i];
     const rowNum = i + 2;
 
-    const vessel_id = parseInt(r.vessel_id);
-    const distance_nm = parseFloat(r.distance_nm);
-    const fuel_tons = parseFloat(r.fuel_tons);
+    // Accept either vessel_id or imo_number for vessel lookup
+let vessel_id = parseInt(r.vessel_id);
+const imoNumber = (r.imo_number || "").trim();
 
-    if (!vessel_id || isNaN(distance_nm) || isNaN(fuel_tons)) {
-      errors.push(`Row ${rowNum}: missing or invalid vessel_id, distance_nm, or fuel_tons`);
+// If no vessel_id but imo_number is provided, look it up
+if (!vessel_id && imoNumber) {
+  try {
+    const lookup = await pool.query(
+      "SELECT id FROM vessels WHERE imo_number = $1",
+      [imoNumber]
+    );
+    if (lookup.rows.length === 0) {
+      errors.push(`Row ${rowNum}: vessel with IMO number "${imoNumber}" not found`);
       continue;
     }
-    if (distance_nm <= 0 || fuel_tons <= 0) {
-      errors.push(`Row ${rowNum}: distance_nm and fuel_tons must be positive`);
-      continue;
-    }
+    vessel_id = lookup.rows[0].id;
+  } catch (err) {
+    errors.push(`Row ${rowNum}: error looking up vessel by IMO: ${err.message}`);
+    continue;
+  }
+}
+
+const distance_nm = parseFloat(r.distance_nm);
+const fuel_tons = parseFloat(r.fuel_tons);
+
+if (!vessel_id || isNaN(distance_nm) || isNaN(fuel_tons)) {
+  errors.push(`Row ${rowNum}: missing or invalid vessel_id/imo_number, distance_nm, or fuel_tons`);
+  continue;
+}
 
     const e = computeEmissions(r.fuel_type, fuel_tons);
 
@@ -219,7 +269,7 @@ router.post("/import/csv", authenticateToken, authorizeRoles("Admin", "Sustainab
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          RETURNING id`,
         [vessel_id, r.departure_port || null, r.arrival_port || null,
-         r.voyage_date || null, distance_nm, parseFloat(r.duration_days) || null,
+         normaliseDate(r.voyage_date), distance_nm, parseFloat(r.duration_days) || null,
          r.fuel_type || null, fuel_tons, e.co2_tons, e.nox_tons, e.sox_tons, req.user.id]
       );
 

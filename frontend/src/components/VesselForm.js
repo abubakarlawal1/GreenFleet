@@ -41,7 +41,7 @@ export default function VesselForm({ token }) {
           </div>
           <div>
             <label>IMO Number</label>
-            <input value={form.imo_number} onChange={set("imo_number")} placeholder="e.g. IMO9876543" required />
+            <input value={form.imo_number} onChange={set("imo_number")} placeholder="e.g. 9876543" required />
           </div>
 
           <div>
@@ -66,33 +66,53 @@ export default function VesselForm({ token }) {
             <label>Gross Tonnage (GT)</label>
             <input type="number" value={form.gross_tonnage} onChange={set("gross_tonnage")} placeholder="e.g. 45000" />
           </div>
-            <div>
-              <label>Default Fuel Type(s)</label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, padding: "8px 0" }}>
-                {["HFO", "VLSFO", "MDO", "MGO", "LSMGO", "LNG"].map((fuel) => {
-                  const selected = (form.fuel_type || "").split(",").filter(Boolean);
-                  const isChecked = selected.includes(fuel);
-                  return (
-                    <label key={fuel} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 400 }}>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={(e) => {
-                          let updated;
-                          if (e.target.checked) {
-                            updated = [...selected, fuel];
-                          } else {
-                            updated = selected.filter((f) => f !== fuel);
-                          }
-                          setForm({ ...form, fuel_type: updated.join(",") });
-                        }}
-                      />
-                      {fuel}
-                    </label>
-                  );
-                })}
-              </div>
+          <div>
+            <label>Default Fuel Type(s)</label>
+            <div style={{ 
+              display: "flex", 
+              flexWrap: "wrap", 
+              gap: 14,
+              padding: "12px 12px",
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              background: "#fff",
+              minHeight: 46,
+              alignItems: "center"
+            }}>
+              {["HFO", "VLSFO", "MDO", "MGO", "LSMGO", "LNG"].map((fuel) => {
+                const selected = (form.fuel_type || "").split(",").filter(Boolean);
+                const isChecked = selected.includes(fuel);
+                return (
+                  <label key={fuel} style={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: 6, 
+                    cursor: "pointer", 
+                    fontWeight: 500,
+                    fontSize: 14,
+                    marginBottom: 0,
+                    color: "var(--text)"
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        let updated;
+                        if (e.target.checked) {
+                          updated = [...selected, fuel];
+                        } else {
+                          updated = selected.filter((f) => f !== fuel);
+                        }
+                        setForm({ ...form, fuel_type: updated.join(",") });
+                      }}
+                      style={{ width: "auto", margin: 0, cursor: "pointer" }}
+                    />
+                    {fuel}
+                  </label>
+                );
+              })}
             </div>
+          </div>
 
           <div>
             <label>Engine Type</label>

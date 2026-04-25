@@ -112,14 +112,15 @@ export default function VoyageForm({ token }) {
 
         {tab === "csv" && (
           <>
-            <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, fontFamily: "monospace", fontSize: 13, overflowX: "auto", marginBottom: 12 }}>
-              vessel_id,departure_port,arrival_port,voyage_date,distance_nm,duration_days,fuel_type,fuel_tons<br/>
-              1,Southampton,Rotterdam,2025-11-15,350,2,VLSFO,45<br/>
-              1,Rotterdam,Hamburg,2025-12-01,280,1.5,VLSFO,38<br/>
-              2,Felixstowe,Antwerp,2025-11-20,180,1,MDO,32
-            </div>
+          <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, fontFamily: "monospace", fontSize: 13, overflowX: "auto", marginBottom: 12 }}>
+            imo_number,departure_port,arrival_port,voyage_date,distance_nm,duration_days,fuel_type,fuel_tons<br/>
+            9876543,Southampton,Rotterdam,15/11/2025,350,2,VLSFO,45<br/>
+            9876543,Rotterdam,Hamburg,01/12/2025,280,1.5,VLSFO,38<br/>
+            9876544,Felixstowe,Antwerp,20/11/2025,180,1,LSMGO,32
+          </div>
             <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
-              Required: <strong>vessel_id</strong>, <strong>distance_nm</strong>, <strong>fuel_tons</strong>. Optional: departure_port, arrival_port, voyage_date, duration_days, fuel_type.
+              Required: <strong>imo_number</strong> (or vessel_id), <strong>distance_nm</strong>, <strong>fuel_tons</strong>. 
+              Optional: departure_port, arrival_port, voyage_date (dd/mm/yyyy or yyyy-mm-dd), duration_days, fuel_type.
             </p>
             <form onSubmit={submitCSV}>
               <div style={{ marginBottom: 12 }}>
