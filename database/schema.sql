@@ -18,10 +18,10 @@ CREATE TABLE IF NOT EXISTS vessels (
   id            SERIAL PRIMARY KEY,
   name          VARCHAR(120) NOT NULL,
   imo_number    VARCHAR(20)  NOT NULL UNIQUE,
-  vessel_type   VARCHAR(60),                        -- e.g. Bulk Carrier, Tanker, Container Ship
-  flag_state    VARCHAR(60),                        -- e.g. United Kingdom, Panama
-  gross_tonnage DECIMAL(12,2),                      -- GT for EEXI/DCS context
-  fuel_type     VARCHAR(30),                        -- default fuel: HFO, MDO, MGO, LNG
+  vessel_type   VARCHAR(60),                        
+  flag_state    VARCHAR(60),                        
+  gross_tonnage DECIMAL(12,2),                      
+  fuel_type     VARCHAR(30),                        
   engine_type   VARCHAR(60),
   fuel_capacity DECIMAL(10,2),
   avg_speed     DECIMAL(10,2),
@@ -36,15 +36,15 @@ CREATE TABLE IF NOT EXISTS voyages (
   vessel_id       INT NOT NULL REFERENCES vessels(id) ON DELETE CASCADE,
   departure_port  VARCHAR(80),
   arrival_port    VARCHAR(80),
-  voyage_date     DATE,                             -- date the voyage started
+  voyage_date     DATE,                             
   distance_nm     DECIMAL(10,2) NOT NULL,
   duration_days  DECIMAL(10,2),
-  fuel_type       VARCHAR(30),                      -- fuel used on this voyage (can differ from vessel default)
+  fuel_type       VARCHAR(30),                      
   fuel_tons       DECIMAL(10,3) NOT NULL,
   co2_tons        DECIMAL(10,3) NOT NULL DEFAULT 0,
   nox_tons        DECIMAL(10,3) NOT NULL DEFAULT 0,
   sox_tons        DECIMAL(10,3) NOT NULL DEFAULT 0,
-  eeoi            DECIMAL(10,6),                    -- Energy Efficiency Operational Indicator (optional)
+  eeoi            DECIMAL(10,6),                    
   created_by      INT REFERENCES users(id) ON DELETE SET NULL,
   created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -53,11 +53,11 @@ CREATE TABLE IF NOT EXISTS voyages (
 CREATE TABLE IF NOT EXISTS recommendations (
   id              SERIAL PRIMARY KEY,
   vessel_id       INT NOT NULL REFERENCES vessels(id) ON DELETE CASCADE,
-  technology      VARCHAR(120) NOT NULL,            -- e.g. Wind-Assisted Propulsion, Hull Optimisation
-  category        VARCHAR(60),                      -- e.g. Propulsion, Hull, Fuel, Operations
+  technology      VARCHAR(120) NOT NULL,            
+  category        VARCHAR(60),                      
   description     TEXT,
-  estimated_reduction_pct DECIMAL(5,2),             -- estimated % emission reduction
-  source_reference VARCHAR(255),                    -- link or citation for the recommendation
+  estimated_reduction_pct DECIMAL(5,2),            
+  source_reference VARCHAR(255),                    
   generated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   generated_by    INT REFERENCES users(id) ON DELETE SET NULL
 );
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS compliance_reports (
   total_distance  DECIMAL(12,2),
   compliance_status VARCHAR(30) DEFAULT 'Pending'
                   CHECK (compliance_status IN ('Compliant','Non-Compliant','Pending')),
-  report_data     TEXT,                             -- JSON blob with full breakdown for PDF generation
+  report_data     TEXT,                             
   generated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   generated_by    INT REFERENCES users(id) ON DELETE SET NULL
 );
@@ -100,10 +100,10 @@ CREATE TABLE IF NOT EXISTS alerts (
 CREATE TABLE IF NOT EXISTS audit_logs (
   id              SERIAL PRIMARY KEY,
   user_id         INT REFERENCES users(id) ON DELETE SET NULL,
-  action          VARCHAR(60) NOT NULL,             -- e.g. CREATE_VESSEL, DELETE_VOYAGE, LOGIN
-  entity_type     VARCHAR(30),                      -- e.g. vessel, voyage, user
+  action          VARCHAR(60) NOT NULL,             
+  entity_type     VARCHAR(30),                      
   entity_id       INT,
-  details         TEXT,                             -- optional JSON with before/after or context
+  details         TEXT,                             
   ip_address      VARCHAR(45),
   created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
